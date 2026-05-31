@@ -63,7 +63,7 @@ class RAGStore:
     def cleanup_expired_messages(self, ttl_hours: int = 24):
         with self.engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM chat_messages WHERE created_at < now() - ((:ttl || ' hours')::interval)"),
+                text("DELETE FROM chat_messages WHERE created_at < now() - (interval '1 hour' * :ttl)"),
                 {"ttl": ttl_hours},
             )
 
@@ -72,7 +72,7 @@ class RAGStore:
             last_created_at = conn.execute(
                 text("SELECT MAX(created_at) FROM chat_messages WHERE session_id = :session_id"),
                 {"session_id": session_id},
-            ).scalar_one()
+            ).scalar()
 
         if last_created_at is None:
             return False
