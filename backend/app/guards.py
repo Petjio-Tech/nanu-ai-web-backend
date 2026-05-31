@@ -30,14 +30,12 @@ def is_in_scope(user_message: str) -> tuple[bool, str]:
     system = prompts.classifier()
     out = gemini_generate_text(system=system, user=user_message)
 
-    # ---- ADD THIS BLOCK ----
     out = out.strip()
     if out.startswith("```"):
         out = out.split("```", 2)[1]  # remove starting fence token
         out = out.replace("json", "", 1).strip()  # tolerate ```json
     if out.endswith("```"):
         out = out.rsplit("```", 1)[0].strip()
-    # ------------------------
 
     try:
         obj = json.loads(out)
@@ -45,4 +43,13 @@ def is_in_scope(user_message: str) -> tuple[bool, str]:
         reason = str(obj.get("reason", ""))
         return allowed, reason
     except Exception:
+        match = re.search(r"\{[\s\S]*\}", out)
+        if match:
+            try:
+                obj = json.loads(match.group(0))
+                allowed = bool(obj.get("allowed"))
+                reason = str(obj.get("reason", ""))
+                return allowed, reason
+            except Exception:
+                pass
         return False, "Unable to classify the query reliably."
