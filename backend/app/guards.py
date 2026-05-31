@@ -43,13 +43,12 @@ def is_in_scope(user_message: str) -> tuple[bool, str]:
         reason = str(obj.get("reason", ""))
         return allowed, reason
     except Exception:
-        match = re.search(r"\{[\s\S]*\}", out)
-        if match:
+        for match in re.finditer(r"\{[\s\S]*?\}", out):
             try:
                 obj = json.loads(match.group(0))
                 allowed = bool(obj.get("allowed"))
                 reason = str(obj.get("reason", ""))
                 return allowed, reason
             except Exception:
-                pass
+                continue
         return False, "Unable to classify the query reliably."
