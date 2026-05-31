@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     GEMINI_API_KEY: str
 
-    PETJIO_ANDROID_APP_URL: str
+    PETJIO_ANDROID_APP_URL: str = "https://play.google.com/store/apps/details?id=com.petjio.app"
 
     CANONICAL_DOMAIN: str = "https://www.petjio.in"
     SITEMAP_URL: str = "https://www.petjio.in/sitemap.xml"

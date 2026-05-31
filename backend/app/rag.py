@@ -48,18 +48,22 @@ class RAGStore:
 
     def query(self, q: str, top_k: int) -> list[RetrievedChunk]:
         q_emb = self.embed(q)
+
+        # Convert python list -> pgvector literal string, e.g. "[0.1,0.2,...]"
+        q_emb_vec = "[" + ",".join(f"{x:.8f}" for x in q_emb) + "]"
+
         with self.engine.begin() as conn:
             rows = conn.execute(
                 text(
                     """
                     SELECT url, title, content,
-                           1 - (embedding <=> :q_emb) AS score
+                        1 - (embedding <=> (:q_emb)::vector) AS score
                     FROM rag_chunks
-                    ORDER BY embedding <=> :q_emb
+                    ORDER BY embedding <=> (:q_emb)::vector
                     LIMIT :k
                     """
                 ),
-                {"q_emb": q_emb, "k": top_k},
+                {"q_emb": q_emb_vec, "k": top_k},
             ).fetchall()
 
         return [RetrievedChunk(url=r[0], title=r[1], content=r[2], score=float(r[3])) for r in rows]

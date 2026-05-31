@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,7 +8,22 @@ from .prompts import prompts
 from .guards import is_in_scope, gemini_generate_text
 from .rag import RAGStore, make_engine
 
-app = FastAPI(title="Nanu AI Web API")
+
+rag_store: RAGStore | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # On startup, load the model
+    global rag_store
+    engine = make_engine()
+    rag_store = RAGStore(engine)
+    rag_store.ensure_schema()
+    yield
+    # On shutdown, you could add cleanup code here if needed
+
+
+app = FastAPI(title="Nanu AI Web API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,10 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-engine = make_engine()
-rag = RAGStore(engine)
-rag.ensure_schema()
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -34,7 +46,8 @@ def chat(req: ChatRequest):
             sources=[],
         )
 
-    retrieved = rag.query(user_message, top_k=settings.RAG_TOP_K)
+    # The RAG store is now guaranteed to be initialized
+    retrieved = rag_store.query(user_message, top_k=settings.RAG_TOP_K)
 
     context_blocks = []
     sources = []

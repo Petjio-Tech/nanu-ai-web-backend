@@ -2,6 +2,7 @@ import json
 import requests
 from .settings import settings
 from .prompts import prompts
+import re
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -11,7 +12,7 @@ def gemini_generate_text(system: str, user: str) -> str:
         "contents": [
             {"role": "user", "parts": [{"text": f"SYSTEM:\n{system}\n\nUSER:\n{user}"}]}
         ],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 800},
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512},
     }
     r = requests.post(url, json=payload, timeout=45)
     r.raise_for_status()
@@ -28,11 +29,20 @@ def gemini_generate_text(system: str, user: str) -> str:
 def is_in_scope(user_message: str) -> tuple[bool, str]:
     system = prompts.classifier()
     out = gemini_generate_text(system=system, user=user_message)
+
+    # ---- ADD THIS BLOCK ----
+    out = out.strip()
+    if out.startswith("```"):
+        out = out.split("```", 2)[1]  # remove starting fence token
+        out = out.replace("json", "", 1).strip()  # tolerate ```json
+    if out.endswith("```"):
+        out = out.rsplit("```", 1)[0].strip()
+    # ------------------------
+
     try:
         obj = json.loads(out)
         allowed = bool(obj.get("allowed"))
         reason = str(obj.get("reason", ""))
         return allowed, reason
     except Exception:
-        # Fail-safe: if classifier fails, be conservative and refuse
         return False, "Unable to classify the query reliably."
