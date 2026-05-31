@@ -10,6 +10,8 @@ from .rag import RAGStore, make_engine
 
 
 rag_store: RAGStore | None = None
+SESSION_EXPIRY_HOURS = 24
+SESSION_EXPIRED_MESSAGE = "Your session has expired. Please consider refreshing the window for a new session."
 
 
 @asynccontextmanager
@@ -37,11 +39,25 @@ app.add_middleware(
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     user_message = req.message.strip()
+    session_id = str(req.session_id)
+
+    if rag_store.is_session_expired(session_id, ttl_hours=SESSION_EXPIRY_HOURS):
+        return ChatResponse(
+            answer=SESSION_EXPIRED_MESSAGE,
+            refused=True,
+            sources=[],
+        )
+
+    history = rag_store.get_recent_messages(session_id, limit=10)
+    history_text = "\n".join(f"{role.capitalize()}: {content}" for role, content in history) if history else "None"
 
     allowed, _reason = is_in_scope(user_message)
     if not allowed:
+        refusal = prompts.refusal(settings.PETJIO_ANDROID_APP_URL)
+        rag_store.add_message(session_id, "user", user_message)
+        rag_store.add_message(session_id, "assistant", refusal)
         return ChatResponse(
-            answer=prompts.refusal(settings.PETJIO_ANDROID_APP_URL),
+            answer=refusal,
             refused=True,
             sources=[],
         )
@@ -62,6 +78,9 @@ def chat(req: ChatRequest):
 User question:
 {user_message}
 
+Conversation history (latest 10 messages):
+{history_text}
+
 PetJio context (may be empty):
 {context}
 
@@ -72,6 +91,8 @@ Instruction:
 """.strip()
 
     answer = gemini_generate_text(system=system, user=user)
+    rag_store.add_message(session_id, "user", user_message)
+    rag_store.add_message(session_id, "assistant", answer)
 
     # Return retrieved sources; the model will also include "Sources" text.
     # Later we can filter to only URLs actually cited.
