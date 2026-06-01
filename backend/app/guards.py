@@ -5,7 +5,10 @@ from .prompts import prompts
 import re
 
 GEMINI_MODEL = "gemini-2.5-flash"
-MEMORY_REQUEST_PATTERN = re.compile(r"\b(remember|save|store|note)\b", re.IGNORECASE)
+MEMORY_REQUEST_PATTERN = re.compile(
+    r"\bremember\b|\b(?:save|store|note)\s+(?:this|it)\b",
+    re.IGNORECASE,
+)
 PROFILE_MEMORY_PATTERNS = [
     re.compile(r"\b(my|preferred)\s+name\s+is\s+\w+", re.IGNORECASE),
     re.compile(r"\bcall\s+me\s+\w+", re.IGNORECASE),
@@ -78,8 +81,6 @@ def is_in_scope(user_message: str) -> tuple[bool, str, str]:
         allowed = bool(obj.get("allowed"))
         reason = str(obj.get("reason", ""))
         category = str(obj.get("category", "out_of_scope"))
-        if not allowed and is_allowed_profile_memory(user_message):
-            return True, "Profile setup detected by guard fallback.", "profile_setup"
         return allowed, reason, category
     except Exception:
         if is_allowed_profile_memory(user_message):
