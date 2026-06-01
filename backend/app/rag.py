@@ -55,6 +55,8 @@ class RAGStore:
                       ON chat_messages (session_id);
                     CREATE INDEX IF NOT EXISTS chat_messages_created_at_idx
                       ON chat_messages (created_at);
+                    CREATE INDEX IF NOT EXISTS chat_messages_session_created_idx
+                      ON chat_messages (session_id, created_at DESC, id DESC);
                     """
                 )
             )
