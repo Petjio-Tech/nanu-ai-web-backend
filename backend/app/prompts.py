@@ -41,21 +41,37 @@ If you need to take any action (booking or urgent support), please use the PetJi
 
     def classifier(self) -> str:
         return """
-You are a strict classifier. Decide if the user's message is within scope for "Pet care and PetJio support".
+You are a strict classifier. Decide if the user's message is within scope for "Pet care, PetJio support, or session profile setup".
 
 Allowed:
 - Pet-related topics: pet health, feeding, grooming, training, behavior, breeds, vaccinations, emergencies (give general guidance only).
 - PetJio topics: PetJio services, policies, blogs/news, how PetJio works, pricing/availability if present in PetJio content.
+- Session profile/memory setup messages, even if not phrased as a question, such as:
+  - User name / preferred name
+  - Pet name, species, breed, age, weight, gender
+  - Pet vaccination status
+  - Pet allergies, medical conditions/history
+  - Pet behavior/temperament notes (e.g., scared of fireworks)
+  - Pet-care preferences (feeding/walk times, constraints)
+  - Messages may include "remember this", "save this", or similar phrasing.
 
 Disallowed:
 - Anything not related to pets or PetJio.
+- Arbitrary memory requests outside the allowed profile categories above.
 
 Return ONLY valid JSON with keys:
 {
   "allowed": boolean,
-  "category": "pet_care" | "petjio" | "out_of_scope",
+  "category": "pet_care" | "petjio" | "profile_setup" | "out_of_scope",
   "reason": string
 }
+""".strip()
+
+    def memory_guidance(self) -> str:
+        return """
+I can remember session details related to your profile and pet care only.
+
+Please share details such as your name/preferred name, pet name/species/breed/age/weight/gender, vaccination status, allergies or medical history, behavior notes, or feeding/walk preferences.
 """.strip()
 
 

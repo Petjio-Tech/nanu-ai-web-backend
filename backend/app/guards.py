@@ -5,6 +5,20 @@ from .prompts import prompts
 import re
 
 GEMINI_MODEL = "gemini-2.5-flash"
+MEMORY_REQUEST_PATTERN = re.compile(
+    r"\bremember\b|\b(?:save|store|note)\s+(?:this|it)\b",
+    re.IGNORECASE,
+)
+PROFILE_MEMORY_PATTERNS = [
+    re.compile(r"\b(my|preferred)\s+name\s+is\s+\w+", re.IGNORECASE),
+    re.compile(r"\bcall\s+me\s+\w+", re.IGNORECASE),
+    re.compile(r"\bmy\s+(dog|cat|pet)['’]s\s+name\s+is\b", re.IGNORECASE),
+    re.compile(r"\bmy\s+(dog|cat|pet)\s+is\s+\d+\s*(year|years|yr|yrs|month|months)\b", re.IGNORECASE),
+    re.compile(r"\b(my\s+)?(dog|cat|pet)\b.*\b(weight|kg|kilogram|lb|pound|breed|species|gender|male|female)\b", re.IGNORECASE),
+    re.compile(r"\b(my\s+)?(dog|cat|pet)\b.*\b(vaccin|allerg|medical|condition|history)\w*\b", re.IGNORECASE),
+    re.compile(r"\b(my\s+)?(dog|cat|pet)\b.*\b(scared|afraid|anxious|nervous|temperament|behavio[u]?r|reactive|aggressive|friendly|shy)\b", re.IGNORECASE),
+    re.compile(r"\b(feeding|walk)\s+(time|times|schedule|preference|preferences)\b", re.IGNORECASE),
+]
 
 def gemini_generate_text(system: str, user: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
@@ -26,23 +40,49 @@ def gemini_generate_text(system: str, user: str) -> str:
     )
 
 
-def is_in_scope(user_message: str) -> tuple[bool, str]:
+def _extract_classifier_json(output_text: str) -> dict:
+    out = output_text.strip()
+    if out.startswith("```"):
+        out = re.sub(r"^```(?:json)?\s*", "", out, flags=re.IGNORECASE)
+        out = re.sub(r"\s*```$", "", out)
+    try:
+        return json.loads(out)
+    except Exception:
+        match = re.search(r"\{.*\}", out, flags=re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        raise
+
+
+def is_memory_request(user_message: str) -> bool:
+    return bool(MEMORY_REQUEST_PATTERN.search(user_message))
+
+
+def is_allowed_profile_memory(user_message: str) -> bool:
+    return any(pattern.search(user_message) for pattern in PROFILE_MEMORY_PATTERNS)
+
+
+def should_persist_message(user_message: str, allowed: bool, category: str) -> bool:
+    if not allowed:
+        return False
+    if category in {"pet_care", "petjio"}:
+        return True
+    if category == "profile_setup":
+        return is_allowed_profile_memory(user_message)
+    return False
+
+
+def is_in_scope(user_message: str) -> tuple[bool, str, str]:
     system = prompts.classifier()
     out = gemini_generate_text(system=system, user=user_message)
 
-    # ---- ADD THIS BLOCK ----
-    out = out.strip()
-    if out.startswith("```"):
-        out = out.split("```", 2)[1]  # remove starting fence token
-        out = out.replace("json", "", 1).strip()  # tolerate ```json
-    if out.endswith("```"):
-        out = out.rsplit("```", 1)[0].strip()
-    # ------------------------
-
     try:
-        obj = json.loads(out)
+        obj = _extract_classifier_json(out)
         allowed = bool(obj.get("allowed"))
         reason = str(obj.get("reason", ""))
-        return allowed, reason
+        category = str(obj.get("category", "out_of_scope"))
+        return allowed, reason, category
     except Exception:
-        return False, "Unable to classify the query reliably."
+        if is_allowed_profile_memory(user_message):
+            return True, "Profile setup detected by guard fallback.", "profile_setup"
+        return False, "Unable to classify the query reliably.", "out_of_scope"

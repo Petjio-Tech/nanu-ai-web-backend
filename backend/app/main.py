@@ -5,13 +5,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from .settings import settings
 from .schemas import ChatRequest, ChatResponse, Source
 from .prompts import prompts
-from .guards import is_in_scope, gemini_generate_text
+from .guards import (
+    gemini_generate_text,
+    is_allowed_profile_memory,
+    is_in_scope,
+    is_memory_request,
+    should_persist_message,
+)
 from .rag import RAGStore, make_engine
 
 
 rag_store: RAGStore | None = None
 SESSION_EXPIRY_HOURS = 24
-SESSION_EXPIRED_MESSAGE = "Your session has expired. Please consider refreshing the window for a new session."
+SESSION_CONTEXT_TURNS = 10
+SESSION_EXPIRED_MESSAGE = "Your session has been expired. Please consider refreshing the window for a new session"
 
 
 @asynccontextmanager
@@ -48,14 +55,21 @@ def chat(req: ChatRequest):
             sources=[],
         )
 
-    history = rag_store.get_recent_messages(session_id, limit=10)
+    history = rag_store.get_recent_messages(session_id, limit=SESSION_CONTEXT_TURNS * 2)
     history_text = "\n".join(f"{role.capitalize()}: {content}" for role, content in history) if history else "None"
 
-    allowed, _reason = is_in_scope(user_message)
+    memory_requested = is_memory_request(user_message)
+    allowed_profile_memory = is_allowed_profile_memory(user_message)
+    if memory_requested and not allowed_profile_memory:
+        return ChatResponse(
+            answer=prompts.memory_guidance(),
+            refused=True,
+            sources=[],
+        )
+
+    allowed, _reason, category = is_in_scope(user_message)
     if not allowed:
         refusal = prompts.refusal(settings.PETJIO_ANDROID_APP_URL)
-        rag_store.add_message(session_id, "user", user_message)
-        rag_store.add_message(session_id, "assistant", refusal)
         return ChatResponse(
             answer=refusal,
             refused=True,
@@ -78,7 +92,7 @@ def chat(req: ChatRequest):
 User question:
 {user_message}
 
-Conversation history (latest 10 messages):
+Conversation history (latest 10 turns):
 {history_text}
 
 PetJio context (may be empty):
@@ -91,8 +105,9 @@ Instruction:
 """.strip()
 
     answer = gemini_generate_text(system=system, user=user)
-    rag_store.add_message(session_id, "user", user_message)
-    rag_store.add_message(session_id, "assistant", answer)
+    if should_persist_message(user_message, allowed=allowed, category=category):
+        rag_store.add_message(session_id, "user", user_message)
+        rag_store.add_message(session_id, "assistant", answer)
 
     # Return retrieved sources; the model will also include "Sources" text.
     # Later we can filter to only URLs actually cited.
