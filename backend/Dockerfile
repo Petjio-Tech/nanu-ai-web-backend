@@ -7,16 +7,12 @@ ENV VIRTUAL_ENV=/opt/venv \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
- && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 
 RUN python -m venv "${VIRTUAL_ENV}" \
  && pip install --upgrade pip \
  && pip install --no-cache-dir --default-timeout=1000 -r requirements.txt \
+ && echo "Pre-caching sentence-transformers/all-MiniLM-L6-v2 into HF_HOME=${HF_HOME}" \
  && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 
 # Stage 2 (runtime): ship only runtime deps, application code, and cached model.
@@ -27,10 +23,6 @@ ENV VIRTUAL_ENV=/opt/venv \
     HF_HOME=/models
 
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
- && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /models /models
