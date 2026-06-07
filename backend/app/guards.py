@@ -1,5 +1,6 @@
 import json
 import requests
+from fastapi import HTTPException
 from .settings import settings
 from .prompts import prompts
 import re
@@ -7,15 +8,32 @@ import re
 GEMINI_MODEL = "gemini-2.5-flash"
 
 def gemini_generate_text(system: str, user: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+    api_key = settings.GEMINI_API_KEY.strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured.")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
     payload = {
         "contents": [
             {"role": "user", "parts": [{"text": f"SYSTEM:\n{system}\n\nUSER:\n{user}"}]}
         ],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 512},
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
     }
-    r = requests.post(url, json=payload, timeout=45)
-    r.raise_for_status()
+    try:
+        r = requests.post(url, json=payload, timeout=45)
+        r.raise_for_status()
+    except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        response_text = (exc.response.text or "").strip() if exc.response is not None else ""
+        if status_code == 401:
+            raise HTTPException(
+                status_code=502,
+                detail="Gemini authentication failed. Check GEMINI_API_KEY and API access for this model.",
+            ) from exc
+        raise HTTPException(
+            status_code=502,
+            detail=response_text or "Gemini request failed.",
+        ) from exc
     data = r.json()
     return (
         data.get("candidates", [{}])[0]
