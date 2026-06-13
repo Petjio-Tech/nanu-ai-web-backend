@@ -13,9 +13,10 @@ CANONICAL_DOMAIN = os.environ.get("CANONICAL_DOMAIN", "https://www.petjio.in")
 EXCLUDE_SUBSTRINGS = [s.strip() for s in os.environ.get("CRAWL_EXCLUDE_SUBSTRINGS", "").split(",") if s.strip()]
 EXCLUDE_DOMAINS = [s.strip() for s in os.environ.get("CRAWL_EXCLUDE_DOMAINS", "").split(",") if s.strip()]
 
-EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-model = SentenceTransformer(EMBED_MODEL_NAME)
-
+model = SentenceTransformer(
+    "sentence-transformers/all-MiniLM-L6-v2",
+    cache_folder="/models"
+)
 
 def is_allowed(url: str) -> bool:
     u = urlparse(url)

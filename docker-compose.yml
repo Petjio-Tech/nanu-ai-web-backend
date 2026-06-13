@@ -12,10 +12,16 @@ services:
 
   api:
     build: ./backend
+
+    volumes:
+      - ./models:/models
+
     env_file:
       - ./.env
+
     depends_on:
       - db
+
     ports:
       - "8000:8000"
 

@@ -2,13 +2,9 @@ from dataclasses import dataclass
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from .settings import settings
-
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
-
-EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-
+import os
 
 @dataclass
 class RetrievedChunk:
@@ -21,8 +17,10 @@ class RetrievedChunk:
 class RAGStore:
     def __init__(self, engine: Engine):
         self.engine = engine
-        self.model = SentenceTransformer(EMBED_MODEL_NAME)
-
+        self.model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2",
+            cache_folder="/models"
+        )
     def embed(self, text_in: str) -> list[float]:
         v = self.model.encode([text_in], normalize_embeddings=True)[0]
         return v.astype(np.float32).tolist()
