@@ -28,21 +28,19 @@ class RAGStore:
     def ensure_schema(self):
         with self.engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            conn.execute(
-                text(
-                    """
-                    CREATE TABLE IF NOT EXISTS rag_chunks (
-                      id bigserial PRIMARY KEY,
-                      url text NOT NULL,
-                      title text,
-                      content text NOT NULL,
-                      embedding vector(384) NOT NULL
-                    );
-                    CREATE INDEX IF NOT EXISTS rag_chunks_embedding_idx
-                      ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-                    """
-                )
-            )
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rag_chunks (
+                id bigserial PRIMARY KEY,
+                url text NOT NULL,
+                title text,
+                content text NOT NULL,
+                embedding vector(384) NOT NULL,
+                source text NOT NULL DEFAULT 'site_crawl'
+                );
+                CREATE INDEX IF NOT EXISTS rag_chunks_embedding_idx
+                ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+            """))
+            conn.execute(text("ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'site_crawl';"))
 
     def query(self, q: str, top_k: int) -> list[RetrievedChunk]:
         q_emb = self.embed(q)

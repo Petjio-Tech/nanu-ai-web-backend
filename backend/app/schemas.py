@@ -15,3 +15,4 @@ class ChatResponse(BaseModel):
     answer: str
     refused: bool = False
     sources: list[Source] = []
+    session_id: str

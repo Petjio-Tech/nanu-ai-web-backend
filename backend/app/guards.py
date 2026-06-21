@@ -44,9 +44,14 @@ def gemini_generate_text(system: str, user: str) -> str:
     )
 
 
-def is_in_scope(user_message: str) -> tuple[bool, str]:
+def is_in_scope(user_message: str, history: str = "") -> tuple[bool, str]:
     system = prompts.classifier()
-    out = gemini_generate_text(system=system, user=user_message)
+    user_payload = (
+        f"Conversation so far:\n{history}\n\nLatest message to classify:\n{user_message}"
+        if history
+        else user_message
+    )
+    out = gemini_generate_text(system=system, user=user_payload)
 
     # ---- ADD THIS BLOCK ----
     out = out.strip()

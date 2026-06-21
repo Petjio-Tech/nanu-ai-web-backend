@@ -57,7 +57,7 @@ def clean_text(html: str) -> tuple[str | None, str]:
     return title, text
 
 
-def chunk_text(text: str, max_chars: int = 1800, overlap: int = 200) -> list[str]:
+def chunk_text(text: str, max_chars: int = 800, overlap: int = 150) -> list[str]:
     if len(text) <= max_chars:
         return [text]
 
@@ -99,6 +99,7 @@ def ensure_schema(engine):
                 """
             )
         )
+        conn.execute(text("ALTER TABLE rag_chunks ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'site_crawl';"))
 
 
 def main():
@@ -110,13 +111,19 @@ def main():
 
     # Optional: clear existing
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE rag_chunks;"))
+        conn.execute(text("DELETE FROM rag_chunks WHERE source = 'site_crawl';"))
 
     for i, url in enumerate(urls, 1):
         try:
             r = requests.get(url, timeout=45, headers={"User-Agent": "NanuAI-WebRAG/1.0"})
             r.raise_for_status()
             title, text_content = clean_text(r.text)
+            
+            print("\n====================")
+            print(url)
+            print("TITLE:", title)
+            print(text_content[:500])
+            print("====================\n")
 
             # small skip rules
             if len(text_content) < 200:
@@ -126,8 +133,9 @@ def main():
             with engine.begin() as conn:
                 for ch in chunks:
                     conn.execute(
-                        text(
-                            "INSERT INTO rag_chunks(url, title, content, embedding) VALUES (:url, :title, :content, :embedding)"
+                         text(
+                            "INSERT INTO rag_chunks(url, title, content, embedding, source) "
+                            "VALUES (:url, :title, :content, :embedding, 'site_crawl')"
                         ),
                         {
                             "url": url,
