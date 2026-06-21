@@ -36,6 +36,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
+     allow_origins=[
+        "https://petjio.in",
+        "https://www.petjio.in",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080/"
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
