@@ -1,4 +1,4 @@
-# PetJio Nanu AI Backend — Status Update
+# Petjio Nanu AI Backend — Status Update
 
 ## 1. The Problem We Found
 
@@ -18,7 +18,7 @@ As a result, the RAG database was indexing navigation menus and footer text inst
 Instead of (or ahead of) building a heavier fix to render JavaScript during crawling, we adopted the emerging **`llms.txt` standard** — a plain static text file convention designed specifically for AI/LLM consumption of a website.
 
 **What was deployed (web side, already live):**
-- `https://www.petjio.in/llms.txt` — short summary: what PetJio is, primary pages, core topics, products
+- `https://www.petjio.in/llms.txt` — short summary: what Petjio is, primary pages, core topics, products
 - `https://www.petjio.in/llms-full.txt` — full structured knowledge base: Mission, Vision, all Services, NanuAI, PetCoin, SOS, Community, Partner Program, FAQ, Disclaimer
 
 These required **no React changes, no new routes, no rebuild of the SEO/rendering pipeline** — just two static files in `public/`. Verified live and serving correct content.

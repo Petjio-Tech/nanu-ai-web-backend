@@ -13,9 +13,6 @@ from .memory import ChatMemory
 rag_store: RAGStore | None = None
 chat_memory: ChatMemory | None = None
 
-# How many prior user+assistant turns to carry into each new request.
-# Kept small on purpose - enough to resolve "it"/"that" follow-ups without
-# letting the prompt (and Gemini cost/latency) grow unbounded.
 MAX_HISTORY_TURNS = 4
 
 
@@ -53,11 +50,15 @@ def _format_history(turns) -> str:
     return "\n".join(f"{t.role.upper()}: {t.content}" for t in turns)
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     user_message = req.message.strip()
 
-    # Resolves to the client-supplied session_id, or mints a new one on first turn.
     session_id = chat_memory.get_or_create_session(req.session_id)
     history_turns = chat_memory.get_recent_turns(session_id, max_turns=MAX_HISTORY_TURNS)
     history_text = _format_history(history_turns)
@@ -91,7 +92,7 @@ prioritize the latest question):
 User question:
 {user_message}
 
-PetJio context (may be empty):
+Petjio context (may be empty):
 {context}
 
 Instruction:
